@@ -58,13 +58,28 @@ class Enemy extends Entity {
   }
 }
 
+class Bonus extends Entity {
+  constructor(xPos) {
+    super();
+    this.x = xPos;
+    this.y = -ENEMY_HEIGHT;
+    this.sprite = images['player.png'];
+
+    // Each enemy should have a different speed
+    this.speed = Math.random() / 2 + 0.25;
+  }
+  update(timeDiff) {
+    this.y = this.y + timeDiff * this.speed;
+  }
+}
+
 class Player extends Entity {
   constructor() {
     super();
     this.x = 2 * PLAYER_WIDTH;
     this.y = GAME_HEIGHT - PLAYER_HEIGHT - 10;
     this.sprite = images['player.png'];
-    this.life = 3;
+    this.numberOfLifes = [1, 2, 3];
   }
 
   // This method is called by the game engine when left/right arrows are pressed
@@ -93,6 +108,9 @@ class Engine {
     // Setup enemies, making sure there are always three
     this.setupEnemies();
 
+    // Setup bonus :
+    this.setupBonus();
+
     // Setup the <canvas> element where we will be drawing
     const canvas = document.createElement('canvas');
     canvas.setAttribute('id', 'canvas');
@@ -107,20 +125,27 @@ class Engine {
     lifeContainer.setAttribute('id', 'life-container');
     element.appendChild(lifeContainer);
 
-    const life1 = document.createElement('img');
-    life1.setAttribute('class', 'life');
-    life1.setAttribute('src', 'images/player.png');
-    lifeContainer.appendChild(life1);
+    this.player.numberOfLifes.forEach((index) => {
+      const life = document.createElement('img');
+      life.setAttribute('class', 'life');
+      life.setAttribute('src', 'images/player.png');
+      lifeContainer.appendChild(life);
+    });
 
-    const life2 = document.createElement('img');
-    life2.setAttribute('class', 'life');
-    life2.setAttribute('src', 'images/player.png');
-    lifeContainer.appendChild(life2);
+    // const life1 = document.createElement('img');
+    // life1.setAttribute('class', 'life');
+    // life1.setAttribute('src', 'images/player.png');
+    // lifeContainer.appendChild(life1);
 
-    const life3 = document.createElement('img');
-    life3.setAttribute('class', 'life');
-    life3.setAttribute('src', 'images/player.png');
-    lifeContainer.appendChild(life3);
+    // const life2 = document.createElement('img');
+    // life2.setAttribute('class', 'life');
+    // life2.setAttribute('src', 'images/player.png');
+    // lifeContainer.appendChild(life2);
+
+    // const life3 = document.createElement('img');
+    // life3.setAttribute('class', 'life');
+    // life3.setAttribute('src', 'images/player.png');
+    // lifeContainer.appendChild(life3);
 
     // Since gameLoop will be called out of context, bind it once here.
     this.gameLoop = this.gameLoop.bind(this);
@@ -139,7 +164,6 @@ class Engine {
       this.addEnemy();
     }
   }
-
   // This method finds a random spot where there is no enemy, and puts one in there
   addEnemy() {
     const enemySpots = GAME_WIDTH / ENEMY_WIDTH;
@@ -151,6 +175,21 @@ class Engine {
     }
     // Create a new Enemy with a position from 0 to 4 in the array and multiplying the value by 75
     this.enemies[enemySpot] = new Enemy(enemySpot * ENEMY_WIDTH);
+  }
+
+  setupBonus() {
+    this.addBonus();
+    setInterval(() => {
+      this.addBonus();
+    }, 5000);
+  }
+
+  addBonus() {
+    const bonusSpots = GAME_WIDTH / PLAYER_WIDTH;
+    const bonusSpot = Math.floor(Math.random() * bonusSpots);
+
+    this.bonus = new Bonus(bonusSpot * PLAYER_WIDTH);
+    // setTimeout(delete this.bonus, 2000);
   }
 
   // This method kicks off the game
@@ -209,10 +248,14 @@ class Engine {
     // Call update on all enemies
     this.enemies.forEach(enemy => enemy.update(timeDiff));
 
+    // Call update to bonus
+    if (this.bonus) this.bonus.update(timeDiff);
+
     // Draw everything!
     this.ctx.drawImage(images['stars.png'], 0, 0); // draw the star bg
     this.enemies.forEach(enemy => enemy.render(this.ctx)); // draw the enemies
     this.player.render(this.ctx); // draw the player
+    if (this.bonus) this.bonus.render(this.ctx);
 
     // Check if any enemies should die
     this.enemies.forEach((enemy, enemyIdx) => {
@@ -221,6 +264,11 @@ class Engine {
       }
     });
     this.setupEnemies();
+
+    // Check if Bonus has been caught
+    if (this.checkBonus()) {
+      this.player.numberOfLifes.push(1);
+    }
 
     // Check if player is dead
     if (this.isPlayerDead()) {
@@ -275,8 +323,35 @@ class Engine {
 
   // isPlayerInSuperMode(){}
 
+  // Check if player gets bonus
+  checkBonus() {
+    const mainPlayer = this.player;
+    if (this.bonus) {
+      if (
+        this.bonus.x < mainPlayer.x + PLAYER_WIDTH &&
+        this.bonus.x + PLAYER_WIDTH > mainPlayer.x &&
+        this.bonus.y < mainPlayer.y + PLAYER_HEIGHT &&
+        this.bonus.y + PLAYER_HEIGHT > mainPlayer.y
+      ) {
+        delete this.bonus;
+        this.player.numberOfLifes.push[1];
+
+        const lifeContainerToAppend = document.getElementById('life-container');
+        const life = document.createElement('img');
+        life.setAttribute('class', 'life');
+        life.setAttribute('src', 'images/player.png');
+        lifeContainerToAppend.appendChild(life);
+
+        console.log(`number of life ${this.player.numberOfLifes.length}`);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  // Check collision with Enemy
+
   checkCollision() {
-    // console.log(this.player.life);
     const mainPlayer = this.player;
     let removelife = false;
 
@@ -290,8 +365,12 @@ class Engine {
       ) {
         // if check collision is true - delete enemy
         delete this.enemies[enemyIdx];
+
+        // remove a life from html and from numeroflife array
         const lifes = document.getElementById('life-container');
         lifes.removeChild(lifes.firstElementChild);
+        console.log(`in Collision ${this.player.numberOfLifes.length}`);
+
         removelife = true;
         console.log(`This other Remove life ${removelife}`);
       }
@@ -302,14 +381,13 @@ class Engine {
 
   isPlayerDead() {
     // check if collision has happened, and then remvoe on life if true
-    if (this.player.life < 1) {
-      console.log('PlayerisDead is true');
+    if (this.player.numberOfLifes.length < 1) {
+      console.log('Im dead');
       return true;
     }
 
     if (this.checkCollision()) {
-      console.log('I still exist');
-      this.player.life -= 1;
+      this.player.numberOfLifes.splice(-1, 1);
     }
 
     return false;
