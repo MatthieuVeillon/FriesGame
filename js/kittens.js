@@ -3,11 +3,14 @@ const GAME_WIDTH = 375;
 const GAME_HEIGHT = 500;
 
 const ENEMY_WIDTH = 75;
-const ENEMY_HEIGHT = 156;
+const ENEMY_HEIGHT = 75;
 const MAX_ENEMIES = 3;
 
 const PLAYER_WIDTH = 75;
-const PLAYER_HEIGHT = 54;
+const PLAYER_HEIGHT = 86;
+
+const ROCKET_WIDTH = 10;
+const ROCKET_HEIGHT = 58;
 
 // These two constants keep us from using "magic numbers" in our code
 const LEFT_ARROW_CODE = 37;
@@ -24,11 +27,32 @@ const MOVE_DOWN = 'down';
 
 // Preload game images
 const images = {};
-['enemy.png', 'stars.png', 'player.png'].forEach((imgName) => {
+[
+  'enemy.png',
+  'stars.png',
+  'player.png',
+  'rocket.png',
+  'bonus.png',
+  'enemy-carrot.png',
+  'enemy-avocado.png',
+  'enemy-radish.png',
+  'enemy-eggplant.png',
+  'enemy-cauliflower.png',
+  'enemy-broccoli.png',
+].forEach((imgName) => {
   const img = document.createElement('img');
   img.src = `images/${imgName}`;
   images[imgName] = img;
 });
+
+const enemyImages = [
+  'enemy-carrot.png',
+  'enemy-avocado.png',
+  'enemy-radish.png',
+  'enemy-eggplant.png',
+  'enemy-cauliflower.png',
+  'enemy-broccoli.png',
+];
 
 // HTML Elements we're gonna upadte constantly in our game
 
@@ -47,7 +71,7 @@ class Enemy extends Entity {
     super();
     this.x = xPos;
     this.y = -ENEMY_HEIGHT;
-    this.sprite = images['enemy.png'];
+    this.sprite = images[enemyImages[Math.floor(Math.random() * 6)]];
 
     // Each enemy should have a different speed
     this.speed = Math.random() / 2 + 0.25;
@@ -73,11 +97,27 @@ class Bonus extends Entity {
   }
 }
 
+class Rocket extends Entity {
+  constructor(xPos, yPos) {
+    super();
+    this.x = xPos + PLAYER_WIDTH / 2;
+    this.y = yPos - 10;
+    this.sprite = images['rocket.png'];
+
+    // Each enemy should have a different speed
+    this.speed = 1;
+  }
+
+  update(timeDiff) {
+    this.y = this.y - timeDiff * this.speed;
+  }
+}
+
 class Player extends Entity {
   constructor() {
     super();
     this.x = 2 * PLAYER_WIDTH;
-    this.y = GAME_HEIGHT - PLAYER_HEIGHT - 10;
+    this.y = GAME_HEIGHT - PLAYER_HEIGHT - 5;
     this.sprite = images['player.png'];
     this.numberOfLifes = [1, 2, 3];
   }
@@ -177,6 +217,7 @@ class Engine {
     this.enemies[enemySpot] = new Enemy(enemySpot * ENEMY_WIDTH);
   }
 
+  // Call the add bonus every X interval of time
   setupBonus() {
     this.addBonus();
     setInterval(() => {
@@ -184,12 +225,21 @@ class Engine {
     }, 5000);
   }
 
+  // Create the bonus
   addBonus() {
     const bonusSpots = GAME_WIDTH / PLAYER_WIDTH;
     const bonusSpot = Math.floor(Math.random() * bonusSpots);
 
     this.bonus = new Bonus(bonusSpot * PLAYER_WIDTH);
     // setTimeout(delete this.bonus, 2000);
+  }
+
+  setupRocket() {
+    document.addEventListener('keydown', (e) => {
+      if (e.keyCode === SUPER_MODE) {
+        this.rocket = new Rocket(this.player.x, this.player.y);
+      }
+    });
   }
 
   // This method kicks off the game
@@ -211,6 +261,7 @@ class Engine {
       } else if (e.keyCode === SUPER_MODE) {
         isSuperMode = true;
         Keydisplay.innerText = 'Q';
+        console.log(this.rocket);
         setTimeout(() => (isSuperMode = false), 3000);
       }
       if (isSuperMode) {
@@ -248,6 +299,12 @@ class Engine {
     // Call update on all enemies
     this.enemies.forEach(enemy => enemy.update(timeDiff));
 
+    // Call update on rocket
+    if (this.rocket) {
+      this.rocket.update(timeDiff);
+      console.log(this.rocket);
+    }
+
     // Call update to bonus
     if (this.bonus) this.bonus.update(timeDiff);
 
@@ -255,6 +312,7 @@ class Engine {
     this.ctx.drawImage(images['stars.png'], 0, 0); // draw the star bg
     this.enemies.forEach(enemy => enemy.render(this.ctx)); // draw the enemies
     this.player.render(this.ctx); // draw the player
+    if (this.rocket) this.rocket.render(this.ctx);
     if (this.bonus) this.bonus.render(this.ctx);
 
     // Check if any enemies should die
@@ -268,6 +326,13 @@ class Engine {
     // Check if Bonus has been caught
     if (this.checkBonus()) {
       this.player.numberOfLifes.push(1);
+    }
+
+    // Check if missile has been fired
+    this.setupRocket();
+
+    if (this.destroyEnemy()) {
+      this.score = this.score + 5000;
     }
 
     // Check if player is dead
@@ -349,11 +414,32 @@ class Engine {
     return false;
   }
 
-  // Check collision with Enemy
+  // Check rocket vs ennemy
+  destroyEnemy() {
+    this.enemies.forEach((enemy, enemyIdx) => {
+      if (this.rocket) {
+        if (
+          enemy.x < this.rocket.x + ROCKET_WIDTH &&
+          enemy.x + ENEMY_WIDTH > this.rocket.x &&
+          enemy.y < this.rocket.y + ROCKET_HEIGHT &&
+          enemy.y + ENEMY_HEIGHT > this.rocket.y
+        ) {
+          console.log('Im touching');
+          delete this.enemies[enemyIdx];
+          delete this.rocket;
+          return true;
+        }
+      }
+      return false;
+    });
+  }
+
+  // Check collision with Enemy and rocket
 
   checkCollision() {
     const mainPlayer = this.player;
     let removelife = false;
+    const mainRocket = this.rocket;
 
     this.enemies.forEach((enemy, enemyIdx) => {
       // checking if all conditions are true below that means there is a collision
