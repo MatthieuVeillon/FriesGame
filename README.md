@@ -10,6 +10,8 @@
 - Add moving background
 - Add points when you hit enemy or get a bonus
 - Add enemy won + lvl stage
+- Make it mobile friendly
+
 
 ## Introduction
 This first project was designed as a way for you to practice and learn about Object Oriented Programming. A good bit of code has already been provided for you, and it makes for an almost-working game.
