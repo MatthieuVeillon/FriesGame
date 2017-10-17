@@ -292,6 +292,7 @@ class Engine {
 
     // Mobile control
     document.addEventListener('touchstart', (e) => {
+      e.preventDefault();
       const touch = e.touches[0];
       console.log(touch);
       console.log(e);
