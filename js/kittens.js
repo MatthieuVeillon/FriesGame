@@ -39,6 +39,7 @@ const images = {};
   'enemy-eggplant.png',
   'enemy-cauliflower.png',
   'enemy-broccoli.png',
+  'impact.png',
 ].forEach((imgName) => {
   const img = document.createElement('img');
   img.src = `images/${imgName}`;
@@ -63,6 +64,22 @@ const Keydisplay = document.getElementById('KeyPressed');
 class Entity {
   render(ctx) {
     ctx.drawImage(this.sprite, this.x, this.y);
+  }
+}
+
+class Impact extends Entity {
+  constructor(xPos, yPos) {
+    super();
+    this.x = xPos;
+    this.y = yPos;
+    this.sprite = images['impact.png'];
+    this.duration = 0;
+    this.max_duration = 10;
+  }
+
+  update(timeDiff) {
+    this.duration += 1;
+    console.log(`duration from object is ${this.duration} and max duration is ${this.max_duration}`);
   }
 }
 
@@ -231,7 +248,6 @@ class Engine {
     const bonusSpot = Math.floor(Math.random() * bonusSpots);
 
     this.bonus = new Bonus(bonusSpot * PLAYER_WIDTH);
-    // setTimeout(delete this.bonus, 2000);
   }
 
   setupRocket() {
@@ -261,7 +277,6 @@ class Engine {
       } else if (e.keyCode === SUPER_MODE) {
         isSuperMode = true;
         Keydisplay.innerText = 'Q';
-        console.log(this.rocket);
         setTimeout(() => (isSuperMode = false), 3000);
       }
       if (isSuperMode) {
@@ -272,6 +287,18 @@ class Engine {
           this.player.move(MOVE_DOWN);
           Keydisplay.innerText = 'Down';
         }
+      }
+    });
+
+    // Mobile control
+    document.addEventListener('touchstart', (e) => {
+      const touch = e.touches[0];
+      console.log(touch);
+      console.log(e);
+      if (touch.clientX < this.player.x) {
+        this.player.move(MOVE_LEFT);
+      } else if (touch.clientX > this.player.x) {
+        this.player.move(MOVE_RIGHT);
       }
     });
 
@@ -302,11 +329,17 @@ class Engine {
     // Call update on rocket
     if (this.rocket) {
       this.rocket.update(timeDiff);
-      console.log(this.rocket);
     }
-
-    // Call update to bonus
+    // Call update to fries bonus
     if (this.bonus) this.bonus.update(timeDiff);
+
+    // Call update to impact
+    if (this.impact) {
+      this.impact.update();
+      if (this.impact.duration >= this.impact.max_duration) {
+        delete this.impact;
+      }
+    }
 
     // Draw everything!
     this.ctx.drawImage(images['stars.png'], 0, 0); // draw the star bg
@@ -314,6 +347,7 @@ class Engine {
     this.player.render(this.ctx); // draw the player
     if (this.rocket) this.rocket.render(this.ctx);
     if (this.bonus) this.bonus.render(this.ctx);
+    if (this.impact) this.impact.render(this.ctx);
 
     // Check if any enemies should die
     this.enemies.forEach((enemy, enemyIdx) => {
@@ -331,8 +365,10 @@ class Engine {
     // Check if missile has been fired
     this.setupRocket();
 
+    // Check if enemy has been destroyed and remove rocket accoridngly
     if (this.destroyEnemy()) {
       this.score = this.score + 5000;
+      delete this.rocket;
     }
 
     // Check if player is dead
@@ -386,7 +422,9 @@ class Engine {
     }
   }
 
-  // isPlayerInSuperMode(){}
+  // isLvlFinished
+
+  // Lvl condition will go there
 
   // Check if player gets bonus
   checkBonus() {
@@ -407,7 +445,6 @@ class Engine {
         life.setAttribute('src', 'images/player.png');
         lifeContainerToAppend.appendChild(life);
 
-        console.log(`number of life ${this.player.numberOfLifes.length}`);
         return true;
       }
     }
@@ -416,6 +453,7 @@ class Engine {
 
   // Check rocket vs ennemy
   destroyEnemy() {
+    let flag = false;
     this.enemies.forEach((enemy, enemyIdx) => {
       if (this.rocket) {
         if (
@@ -424,17 +462,16 @@ class Engine {
           enemy.y < this.rocket.y + ROCKET_HEIGHT &&
           enemy.y + ENEMY_HEIGHT > this.rocket.y
         ) {
-          console.log('Im touching');
+          // External consequences - (the action of deleting the rocket in itselve happens in the destroyEnemy above)
           delete this.enemies[enemyIdx];
-          delete this.rocket;
-          return true;
+          flag = true;
         }
       }
-      return false;
     });
+    return flag;
   }
 
-  // Check collision with Enemy and rocket
+  // Check collision with Enemy
 
   checkCollision() {
     const mainPlayer = this.player;
@@ -449,16 +486,16 @@ class Engine {
         enemy.y < mainPlayer.y + PLAYER_HEIGHT &&
         enemy.y + ENEMY_HEIGHT > mainPlayer.y
       ) {
+        this.impact = new Impact(this.player.x, this.player.y);
+        // setTimeout(() => delete this.impact, 400);
+
         // if check collision is true - delete enemy
         delete this.enemies[enemyIdx];
 
         // remove a life from html and from numeroflife array
         const lifes = document.getElementById('life-container');
         lifes.removeChild(lifes.firstElementChild);
-        console.log(`in Collision ${this.player.numberOfLifes.length}`);
-
         removelife = true;
-        console.log(`This other Remove life ${removelife}`);
       }
     });
     return removelife;
@@ -468,7 +505,6 @@ class Engine {
   isPlayerDead() {
     // check if collision has happened, and then remvoe on life if true
     if (this.player.numberOfLifes.length < 1) {
-      console.log('Im dead');
       return true;
     }
 
